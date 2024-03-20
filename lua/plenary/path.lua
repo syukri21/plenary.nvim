@@ -19,6 +19,14 @@ local S_IF = {
 local path = {}
 path.home = vim.loop.os_homedir()
 
+path.seps = (function()
+  if S.is_windows() and S.uses_shellslash() then
+    return "/\\"
+  else
+	return path.sep
+  end
+end)()
+
 path.sep = (function()
   if jit then
     if not S.is_windows() or S.uses_shellslash() then
@@ -32,14 +40,14 @@ path.sep = (function()
 end)()
 
 path.root = (function()
-  if not S.is_windows() or S.uses_shellslash then
+  if not S.is_windows() then
     return function()
       return "/"
     end
   else
     return function(base)
       base = base or vim.loop.cwd()
-      return base:sub(1, 1) .. ":\\"
+      return base:sub(1, 1) .. (S.uses_shellslash() and ":/" or ':\\')
     end
   end
 end)()
@@ -62,7 +70,7 @@ local function is_root(pathname)
 end
 
 local _split_by_separator = (function()
-  local formatted = string.format("([^%s]+)", path.sep)
+  local formatted = string.format("([^%s]+)", path.seps)
   return function(filepath)
     local t = {}
     for str in string.gmatch(filepath, formatted) do
@@ -76,11 +84,12 @@ local is_uri = function(filename)
   return string.match(filename, "^%w+://") ~= nil
 end
 
-local is_absolute = function(filename, sep)
+local is_absolute = function(filename)
   if S.is_windows() then
-    return string.match(filename, "^[%a]:\\.*$") ~= nil
+      -- both \ and / are valid path separators on Windows
+      return string.match(filename, "^[%a]:[\\/].*$") ~= nil
   end
-  return string.sub(filename, 1, 1) == sep
+  return string.sub(filename, 1, 1) == '/'
 end
 
 local function _normalize_path(filename, cwd)
@@ -99,7 +108,7 @@ local function _normalize_path(filename, cwd)
   local has = string.find(filename, path.sep .. "..", 1, true) or string.find(filename, ".." .. path.sep, 1, true)
 
   if has then
-    local is_abs = is_absolute(filename, path.sep)
+    local is_abs = is_absolute(filename)
     local split_without_disk_name = function(filename_local)
       local parts = _split_by_separator(filename_local)
       -- Remove disk name part on Windows
@@ -145,8 +154,8 @@ local clean = function(pathname)
     return pathname
   end
 
-  -- Remove double path seps, it's annoying
-  pathname = pathname:gsub(path.sep .. path.sep, path.sep)
+  -- Remove multiple path seps, it's annoying
+  pathname = pathname:gsub('['..path.seps..']+', path.sep)
 
   -- Remove trailing path sep if not root
   if not is_root(pathname) and pathname:sub(-1) == path.sep then
@@ -677,7 +686,7 @@ function Path:is_dir()
 end
 
 function Path:is_absolute()
-  return is_absolute(self.filename, self._sep)
+  return is_absolute(self.filename)
 end
 -- }}}
 
