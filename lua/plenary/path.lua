@@ -155,7 +155,7 @@ local clean = function(pathname)
   end
 
   -- Remove multiple path seps, it's annoying
-  pathname = pathname:gsub('['..path.seps..']+', path.sep)
+  pathname = pathname:gsub('['..path.sep..']+', path.sep)
 
   -- Remove trailing path sep if not root
   if not is_root(pathname) and pathname:sub(-1) == path.sep then
